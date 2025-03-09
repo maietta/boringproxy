@@ -1,4 +1,4 @@
-package boringproxy
+package tunnels
 
 import (
 	"bufio"
@@ -401,8 +401,8 @@ func (p *Server) passthroughRequest(conn net.Conn, tunnel Tunnel) {
 	wg.Wait()
 }
 
-func setAdminDomain(certConfig *certmagic.Config, db *Database, namedropClient *namedrop.Client, autoCerts bool) error {
-	action := prompt("\nNo admin domain set. Select an option below:\nEnter '1' to input manually\nEnter '2' to configure through TakingNames.io\n")
+func setAdminDomain(certConfig *certmagic.Config, db *Database, client *Client, autoCerts bool) error {
+	action := prompt("\nNo admin domain set. Select an option below:\nEnter '1' to input manually\nEnter '2' to configure through tunnels.pro\n")
 	switch action {
 	case "1":
 		adminDomain := prompt("\nEnter admin domain:\n")
@@ -416,17 +416,16 @@ func setAdminDomain(certConfig *certmagic.Config, db *Database, namedropClient *
 
 		db.SetAdminDomain(adminDomain)
 	case "2":
-
 		log.Println("Get bootstrap domain")
 
-		namedropLink, err := namedropClient.BootstrapLink()
+		tunnelLink, err := client.BootstrapLink()
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		qrterminal.GenerateHalfBlock(namedropLink, qrterminal.L, os.Stdout)
+		qrterminal.GenerateHalfBlock(tunnelLink, qrterminal.L, os.Stdout)
 		fmt.Print("Use the link below or scan the QR code above to select an admin domain:\n")
-		fmt.Printf("%s\n\n", namedropLink)
+		fmt.Printf("%s\n\n", tunnelLink)
 
 	default:
 		log.Fatal("Invalid option")

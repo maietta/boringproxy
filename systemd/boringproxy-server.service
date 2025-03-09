@@ -1,15 +1,19 @@
 [Unit]
-Description=boringproxy Admin Server
+Description=tunnels.pro Gateway Server
 After=network.target
 
 [Service]
-PrivateTmp=true
 Type=simple
-User=boringproxy
-Group=boringproxy
-WorkingDirectory=/home/boringproxy/
-ExecStart=/usr/local/bin/boringproxy server \
-	-admin-domain bp.example.com
+Restart=always
+RestartSec=1
+User=tunnels
+Group=tunnels
+WorkingDirectory=/home/tunnels/
+ExecStart=/usr/local/bin/tunnels server \
+    --db-dir /home/tunnels/.tunnels \
+    --cert-dir /home/tunnels/.tunnels/certs \
+    --acme-email your@email.com \
+    --accept-ca-terms
 
 [Install]
 WantedBy=multi-user.target

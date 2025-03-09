@@ -1,17 +1,19 @@
 [Unit]
-Description=boringproxy client
+Description=tunnels.pro client
 After=network.target
 
 [Service]
-PrivateTmp=true
 Type=simple
-User=boringproxy
-Group=boringproxy
-WorkingDirectory=/home/boringproxy/
-ExecStart=/usr/local/bin/boringproxy client \
-	-server bp.example.com \
-	-token your-bp-server-token \
-	-acme-email your-email-address
+Restart=always
+RestartSec=1
+User=tunnels
+Group=tunnels
+WorkingDirectory=/home/tunnels/
+ExecStart=/usr/local/bin/tunnels client \
+    --server gateway.tunnels.pro \
+    --token YOUR_TOKEN \
+    --client-name YOUR_CLIENT \
+    --user admin
 
 [Install]
 WantedBy=multi-user.target

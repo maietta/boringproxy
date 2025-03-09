@@ -1,4 +1,4 @@
-package boringproxy
+package tunnels
 
 import (
 	"sync"

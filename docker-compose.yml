@@ -1,8 +1,10 @@
-version: '3.5'
+version: '3'
 services:
-  boringproxy:
-    build: ./
-    image: boringproxy
+  tunnels:
+    build: .
+    image: tunnels
     ports:
       - "80:80"
       - "443:443"
+    volumes:
+      - ~/.tunnels:/root/.tunnels

@@ -1,4 +1,4 @@
-module github.com/boringproxy/boringproxy
+module github.com/premoweb/tunnels.pro
 
 go 1.23.0
 

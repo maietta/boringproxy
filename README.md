@@ -1,17 +1,10 @@
-# boringproxy
+# tunnels.pro
 
-boringproxy development is sponsored by [TakingNames.io](https://takingnames.io).
-boringproxy offers full integration with TakingNames.io, providing the simplest
-way to get up and running with your own domain. More information [here](https://takingnames.io/blog/introducing-takingnames-io),
-and a demo video of boringproxy working with TakingNames.io [here](https://youtu.be/9hf72-fYTts).
+A service by PremoWeb LLC that makes your local services accessible from the internet securely through an encrypted tunnel.
 
-<a href='https://takingnames.io/blog/introducing-takingnames-io'>
-  <img src='https://user-images.githubusercontent.com/7820200/148330003-5f8062ff-22b2-423d-b945-3db87abf10e5.png' width='400'></img>
-</a>
+# What is tunnels.pro?
 
-# What is boringproxy?
-
-boringproxy is a reverse proxy that makes your local services accessible from the internet securely. It consists of two parts:
+tunnels.pro is a reverse proxy that makes your local services accessible from the internet securely. It consists of two parts:
 
 1. **Gateway Server**: A server with a public IP address that handles incoming traffic and SSL certificates
 2. **Client**: Your local machine (like a development laptop) where your actual services run
@@ -56,21 +49,21 @@ You need a server with:
 ### Install on Gateway Server
 ```bash
 # Clone and build
-git clone https://github.com/maietta/boringproxy
-cd boringproxy
+git clone https://github.com/premoweb/tunnels.pro
+cd tunnels.pro
 ./install_go.sh
 source $HOME/.bashrc
 ./scripts/generate_logo.sh
-cd cmd/boringproxy
+cd cmd/tunnels
 go build
 
 # Allow binding to ports 80/443
-sudo setcap cap_net_bind_service=+ep boringproxy
+sudo setcap cap_net_bind_service=+ep tunnels
 
 # Start the gateway server
-./boringproxy server \
-  --db-dir ~/.boringproxy \
-  --cert-dir ~/.boringproxy/certs \
+./tunnels server \
+  --db-dir ~/.tunnels \
+  --cert-dir ~/.tunnels/certs \
   --acme-email your@email.com \
   --accept-ca-terms \
   --print-login
@@ -87,18 +80,18 @@ Save the admin token and URL - you'll need them to connect clients.
 
 On your local machine where your service is running:
 
-1. Build boringproxy the same way as the gateway:
+1. Build tunnels.pro the same way as the gateway:
 ```bash
-git clone https://github.com/maietta/boringproxy
-cd boringproxy
+git clone https://github.com/premoweb/tunnels.pro
+cd tunnels.pro
 ./scripts/generate_logo.sh
-cd cmd/boringproxy
+cd cmd/tunnels
 go build
 ```
 
 2. Connect to your gateway server:
 ```bash
-./boringproxy client \
+./tunnels client \
   --server your-gateway-domain.com \
   --token YOUR_ADMIN_TOKEN \
   --client-name my-laptop \
@@ -120,7 +113,7 @@ Your service will now be accessible at `https://myapp.your-gateway-domain.com`!
 ## Gateway Server Options
 
 ```bash
-./boringproxy server [options]
+./tunnels server [options]
   --db-dir DIR          Directory for database storage
   --cert-dir DIR        Directory for SSL certificates
   --acme-email EMAIL    Email for Let's Encrypt registration
@@ -134,7 +127,7 @@ Your service will now be accessible at `https://myapp.your-gateway-domain.com`!
 ## Client Options
 
 ```bash
-./boringproxy client [options]
+./tunnels client [options]
   --server DOMAIN       Gateway server domain
   --token TOKEN        Admin token from gateway
   --client-name NAME   Unique name for this client
@@ -147,8 +140,8 @@ For local development and testing, you can run both gateway and client on the sa
 
 1. Start the gateway in HTTP mode:
 ```bash
-./boringproxy server \
-  --db-dir ~/.boringproxy \
+./tunnels server \
+  --db-dir ~/.tunnels \
   --allow-http \
   --http-port 3000 \
   --https-port 3001 \
@@ -158,7 +151,7 @@ For local development and testing, you can run both gateway and client on the sa
 
 2. In another terminal, start the client:
 ```bash
-./boringproxy client \
+./tunnels client \
   --server localhost:3001 \
   --token YOUR_LOCAL_TOKEN \
   --client-name local-dev \
@@ -167,11 +160,6 @@ For local development and testing, you can run both gateway and client on the sa
 
 # Getting Help
 
-If you run into problems running boringproxy, the best place to ask for help is
-over at the [IndieBits][0] community, where we have a [dedicated section][1]
-for boringproxy support. If you think you've found a bug, or want to discuss
-development, please [open an issue][2].
+If you run into problems or have questions, please [open an issue][1] on GitHub.
 
-[0]: https://forum.indiebits.io
-[1]: https://forum.indiebits.io/c/boringproxy-support/9
-[2]: https://github.com/maietta/boringproxy/issues
+[1]: https://github.com/premoweb/tunnels.pro/issues
