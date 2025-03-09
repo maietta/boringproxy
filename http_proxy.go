@@ -66,9 +66,9 @@ func proxyRequest(w http.ResponseWriter, r *http.Request, tunnel Tunnel, httpCli
 	xForwardedFor := remoteHost
 
 	if behindProxy {
-		xForwardedFor := downstreamReqHeaders.Get("X-Forwarded-For")
-		if xForwardedFor != "" {
-			xForwardedFor = xForwardedFor + ", " + remoteHost
+		prevForwardedFor := downstreamReqHeaders.Get("X-Forwarded-For")
+		if prevForwardedFor != "" {
+			xForwardedFor = prevForwardedFor + ", " + remoteHost
 		}
 	}
 

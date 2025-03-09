@@ -42,14 +42,14 @@ func (a *Api) handleTunnels(w http.ResponseWriter, r *http.Request) {
 	token, err := extractToken("access_token", r)
 	if err != nil {
 		w.WriteHeader(401)
-		w.Write([]byte("No token provided"))
+		w.Write([]byte("no token provided"))
 		return
 	}
 
 	tokenData, exists := a.db.GetTokenData(token)
 	if !exists {
 		w.WriteHeader(403)
-		w.Write([]byte("Not authorized"))
+		w.Write([]byte("not authorized"))
 		return
 	}
 
@@ -72,7 +72,7 @@ func (a *Api) handleTunnels(w http.ResponseWriter, r *http.Request) {
 		clientName := query.Get("client-name")
 		if clientName != "" && tokenData.Client != "" && clientName != tokenData.Client {
 			w.WriteHeader(403)
-			w.Write([]byte("Token is not valid for this client"))
+			w.Write([]byte("token is not valid for this client"))
 			return
 		}
 
@@ -90,7 +90,7 @@ func (a *Api) handleTunnels(w http.ResponseWriter, r *http.Request) {
 		body, err := json.Marshal(tunnels)
 		if err != nil {
 			w.WriteHeader(500)
-			w.Write([]byte("Error encoding tunnels"))
+			w.Write([]byte("error encoding tunnels"))
 			return
 		}
 
@@ -104,7 +104,7 @@ func (a *Api) handleTunnels(w http.ResponseWriter, r *http.Request) {
 
 		if tokenData.Client != "" {
 			w.WriteHeader(403)
-			io.WriteString(w, "Token cannot be used to create tunnels")
+			io.WriteString(w, "token cannot be used to create tunnels")
 			return
 		}
 
@@ -117,7 +117,7 @@ func (a *Api) handleTunnels(w http.ResponseWriter, r *http.Request) {
 	case "DELETE":
 		if tokenData.Client != "" {
 			w.WriteHeader(403)
-			io.WriteString(w, "Token cannot be used to delete tunnels")
+			io.WriteString(w, "token cannot be used to delete tunnels")
 			return
 		}
 
@@ -129,7 +129,7 @@ func (a *Api) handleTunnels(w http.ResponseWriter, r *http.Request) {
 		}
 	default:
 		w.WriteHeader(405)
-		w.Write([]byte("Invalid method for /tunnels"))
+		w.Write([]byte("invalid method for /tunnels"))
 	}
 }
 
@@ -277,20 +277,22 @@ func (a *Api) handleClients(w http.ResponseWriter, r *http.Request) {
 func (a *Api) GetTunnel(tokenData TokenData, params url.Values) (Tunnel, error) {
 	domain := params.Get("domain")
 	if domain == "" {
-		return Tunnel{}, errors.New("Invalid domain parameter")
+		return Tunnel{}, errors.New("invalid domain parameter")
 	}
 
 	tun, exists := a.db.GetTunnel(domain)
 	if !exists {
-		return Tunnel{}, errors.New("Tunnel doesn't exist for domain")
+		return Tunnel{}, errors.New("tunnel doesn't exist")
 	}
 
-	user, _ := a.db.GetUser(tokenData.Owner)
-	if user.IsAdmin || tun.Owner == tokenData.Owner {
-		return tun, nil
-	} else {
-		return Tunnel{}, errors.New("Unauthorized")
+	if tokenData.Owner != tun.Owner {
+		user, _ := a.db.GetUser(tokenData.Owner)
+		if !user.IsAdmin {
+			return Tunnel{}, errors.New("unauthorized")
+		}
 	}
+
+	return tun, nil
 }
 
 func (a *Api) GetTunnels(tokenData TokenData) map[string]Tunnel {
@@ -318,19 +320,19 @@ func (a *Api) CreateTunnel(tokenData TokenData, params url.Values) (*Tunnel, err
 
 	domain := params.Get("domain")
 	if domain == "" {
-		return nil, errors.New("Invalid domain parameter")
+		return nil, errors.New("invalid domain parameter")
 	}
 
 	owner := params.Get("owner")
 	if owner == "" {
-		return nil, errors.New("Invalid owner parameter")
+		return nil, errors.New("invalid owner parameter")
 	}
 
 	// Only admins can create tunnels for other users
 	if tokenData.Owner != owner {
 		user, _ := a.db.GetUser(tokenData.Owner)
 		if !user.IsAdmin {
-			return nil, errors.New("Unauthorized")
+			return nil, errors.New("unauthorized")
 		}
 	}
 
@@ -342,7 +344,7 @@ func (a *Api) CreateTunnel(tokenData TokenData, params url.Values) (*Tunnel, err
 		var err error
 		clientPort, err = strconv.Atoi(clientPortParam)
 		if err != nil {
-			return nil, errors.New("Invalid client-port parameter")
+			return nil, errors.New("invalid client-port parameter")
 		}
 	}
 
@@ -357,7 +359,7 @@ func (a *Api) CreateTunnel(tokenData TokenData, params url.Values) (*Tunnel, err
 		var err error
 		tunnelPort, err = strconv.Atoi(tunnelPortParam)
 		if err != nil {
-			return nil, errors.New("Invalid tunnel-port parameter")
+			return nil, errors.New("invalid tunnel-port parameter")
 		}
 	}
 
@@ -370,18 +372,18 @@ func (a *Api) CreateTunnel(tokenData TokenData, params url.Values) (*Tunnel, err
 	if passwordProtect {
 		username = params.Get("username")
 		if username == "" {
-			return nil, errors.New("Username required")
+			return nil, errors.New("username required")
 		}
 
 		password = params.Get("password")
 		if password == "" {
-			return nil, errors.New("Password required")
+			return nil, errors.New("password required")
 		}
 	}
 
 	tlsTerm := params.Get("tls-termination")
 	if tlsTerm != "server" && tlsTerm != "client" && tlsTerm != "passthrough" && tlsTerm != "client-tls" && tlsTerm != "server-tls" {
-		return nil, errors.New("Invalid tls-termination parameter")
+		return nil, errors.New("invalid tls-termination parameter")
 	}
 
 	sshServerAddr := a.db.GetAdminDomain()
@@ -396,7 +398,7 @@ func (a *Api) CreateTunnel(tokenData TokenData, params url.Values) (*Tunnel, err
 		var err error
 		sshServerPort, err = strconv.Atoi(sshServerPortParam)
 		if err != nil {
-			return nil, errors.New("Invalid ssh-server-port parameter")
+			return nil, errors.New("invalid ssh-server-port parameter")
 		}
 	}
 
@@ -427,18 +429,18 @@ func (a *Api) DeleteTunnel(tokenData TokenData, params url.Values) error {
 
 	domain := params.Get("domain")
 	if domain == "" {
-		return errors.New("Invalid domain parameter")
+		return errors.New("invalid domain parameter")
 	}
 
 	tun, exists := a.db.GetTunnel(domain)
 	if !exists {
-		return errors.New("Tunnel doesn't exist")
+		return errors.New("tunnel doesn't exist")
 	}
 
 	if tokenData.Owner != tun.Owner {
 		user, _ := a.db.GetUser(tokenData.Owner)
 		if !user.IsAdmin {
-			return errors.New("Unauthorized")
+			return errors.New("unauthorized")
 		}
 	}
 
@@ -451,13 +453,13 @@ func (a *Api) CreateToken(tokenData TokenData, params url.Values) (string, error
 
 	ownerId := params.Get("owner")
 	if ownerId == "" {
-		return "", errors.New("Invalid owner paramater")
+		return "", errors.New("invalid owner parameter")
 	}
 
 	user, _ := a.db.GetUser(tokenData.Owner)
 
 	if tokenData.Owner != ownerId && !user.IsAdmin {
-		return "", errors.New("Unauthorized")
+		return "", errors.New("unauthorized")
 	}
 
 	var owner User
@@ -472,7 +474,7 @@ func (a *Api) CreateToken(tokenData TokenData, params url.Values) (string, error
 
 	if client != "any" {
 		if _, exists := owner.Clients[client]; !exists {
-			return "", fmt.Errorf("Client %s does not exist for user %s", client, ownerId)
+			return "", fmt.Errorf("client %s does not exist for user %s", client, ownerId)
 		}
 	} else {
 		client = ""
@@ -480,7 +482,7 @@ func (a *Api) CreateToken(tokenData TokenData, params url.Values) (string, error
 
 	token, err := a.db.AddToken(ownerId, client)
 	if err != nil {
-		return "", errors.New("Failed to create token")
+		return "", errors.New("failed to create token")
 	}
 
 	return token, nil
@@ -489,25 +491,24 @@ func (a *Api) CreateToken(tokenData TokenData, params url.Values) (string, error
 func (a *Api) DeleteToken(tokenData TokenData, params url.Values) error {
 	token := params.Get("token")
 	if token == "" {
-		return errors.New("Invalid token parameter")
+		return errors.New("invalid token parameter")
 	}
 
 	delTokenData, exists := a.db.GetTokenData(token)
 	if !exists {
-		return errors.New("Token doesn't exist")
+		return errors.New("token doesn't exist")
 	}
 
 	if tokenData.Owner != delTokenData.Owner {
 		user, _ := a.db.GetUser(tokenData.Owner)
 		if !user.IsAdmin {
-			return errors.New("Unauthorized")
+			return errors.New("unauthorized")
 		}
 	}
 
 	a.db.DeleteTokenData(token)
 
 	return nil
-
 }
 
 func (a *Api) GetTokens(tokenData TokenData, params url.Values) map[string]TokenData {
@@ -572,12 +573,12 @@ func (a *Api) DeleteUser(tokenData TokenData, params url.Values) error {
 
 	username := params.Get("username")
 	if username == "" {
-		return errors.New("Invalid username parameter")
+		return errors.New("invalid username parameter")
 	}
 
 	_, exists := a.db.GetUser(username)
 	if !exists {
-		return errors.New("User doesn't exist")
+		return errors.New("user doesn't exist")
 	}
 
 	a.db.DeleteUser(username)

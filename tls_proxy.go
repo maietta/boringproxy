@@ -59,7 +59,7 @@ func handleConnection(conn net.Conn, upstreamAddr string, port int) {
 		}
 		upstreamConn, err = tls.Dial("tcp", fmt.Sprintf("%s:%d", addr, port), tlsConfig)
 	} else {
-		upstreamConn, err = net.Dial("tcp", fmt.Sprintf("%s:%d", addr, port))
+		upstreamConn, err = net.Dial("tcp", net.JoinHostPort(addr, fmt.Sprintf("%d", port)))
 	}
 
 	if err != nil {

@@ -17,7 +17,7 @@ type Database struct {
 	Tokens      map[string]TokenData           `json:"tokens"`
 	Tunnels     map[string]Tunnel              `json:"tunnels"`
 	Users       map[string]User                `json:"users"`
-	dnsRequests map[string]namedrop.DNSRequest `json:"dns_requests"`
+	DNSRequests map[string]namedrop.DNSRequest `json:"dns_requests"`
 	mutex       *sync.Mutex
 }
 
@@ -94,8 +94,8 @@ func NewDatabase(path string) (*Database, error) {
 		db.Users = make(map[string]User)
 	}
 
-	if db.dnsRequests == nil {
-		db.dnsRequests = make(map[string]namedrop.DNSRequest)
+	if db.DNSRequests == nil {
+		db.DNSRequests = make(map[string]namedrop.DNSRequest)
 	}
 
 	db.mutex = &sync.Mutex{}
@@ -126,7 +126,7 @@ func (d *Database) SetDNSRequest(requestId string, request namedrop.DNSRequest) 
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	d.dnsRequests[requestId] = request
+	d.DNSRequests[requestId] = request
 
 	// Not currently persisting because dnsRequests is only stored in
 	// memory. May change in the future.
@@ -136,17 +136,17 @@ func (d *Database) GetDNSRequest(requestId string) (namedrop.DNSRequest, error) 
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	if req, ok := d.dnsRequests[requestId]; ok {
+	if req, ok := d.DNSRequests[requestId]; ok {
 		return req, nil
 	}
 
-	return namedrop.DNSRequest{}, errors.New("No such DNS Request")
+	return namedrop.DNSRequest{}, errors.New("no such DNS request")
 }
 func (d *Database) DeleteDNSRequest(requestId string) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	delete(d.dnsRequests, requestId)
+	delete(d.DNSRequests, requestId)
 }
 
 func (d *Database) AddToken(owner, client string) (string, error) {
@@ -155,12 +155,12 @@ func (d *Database) AddToken(owner, client string) (string, error) {
 
 	_, exists := d.Users[owner]
 	if !exists {
-		return "", errors.New("Owner doesn't exist")
+		return "", errors.New("owner doesn't exist")
 	}
 
 	token, err := genRandomCode(32)
 	if err != nil {
-		return "", errors.New("Could not generat token")
+		return "", errors.New("could not generate token")
 	}
 
 	d.Tokens[token] = TokenData{

@@ -8,14 +8,15 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/caddyserver/certmagic"
-	"golang.org/x/crypto/ssh"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"os/user"
 	"strings"
 	"sync"
+
+	"github.com/caddyserver/certmagic"
+	"golang.org/x/crypto/ssh"
 )
 
 type TunnelManager struct {
@@ -56,18 +57,18 @@ func (m *TunnelManager) GetTunnels() map[string]Tunnel {
 func (m *TunnelManager) RequestCreateTunnel(tunReq Tunnel) (Tunnel, error) {
 
 	if tunReq.Domain == "" {
-		return Tunnel{}, errors.New("Domain required")
+		return Tunnel{}, errors.New("domain required")
 	}
 
 	if tunReq.Owner == "" {
-		return Tunnel{}, errors.New("Owner required")
+		return Tunnel{}, errors.New("owner required")
 	}
 
 	if tunReq.TlsTermination == "server" || tunReq.TlsTermination == "server-tls" {
 		if m.config.autoCerts {
 			err := m.certConfig.ManageSync(context.Background(), []string{tunReq.Domain})
 			if err != nil {
-				return Tunnel{}, errors.New("Failed to get cert")
+				return Tunnel{}, errors.New("failed to get cert")
 			}
 		}
 	}
@@ -120,7 +121,7 @@ func (m *TunnelManager) DeleteTunnel(domain string) error {
 
 	authKeysPath := fmt.Sprintf("%s/.ssh/authorized_keys", m.user.HomeDir)
 
-	akBytes, err := ioutil.ReadFile(authKeysPath)
+	akBytes, err := os.ReadFile(authKeysPath)
 	if err != nil {
 		return err
 	}
@@ -143,7 +144,7 @@ func (m *TunnelManager) DeleteTunnel(domain string) error {
 
 	outStr := strings.Join(outLines, "\n")
 
-	err = ioutil.WriteFile(authKeysPath, []byte(outStr), 0600)
+	err = os.WriteFile(authKeysPath, []byte(outStr), 0600)
 	if err != nil {
 		return err
 	}
@@ -155,7 +156,7 @@ func (m *TunnelManager) GetPort(domain string) (int, error) {
 	tunnel, exists := m.db.GetTunnel(domain)
 
 	if !exists {
-		return 0, errors.New("Doesn't exist")
+		return 0, errors.New("doesn't exist")
 	}
 
 	return tunnel.TunnelPort, nil
@@ -171,7 +172,7 @@ func (m *TunnelManager) addToAuthorizedKeys(domain string, port int, allowExtern
 	}
 	defer akFile.Close()
 
-	akBytes, err := ioutil.ReadAll(akFile)
+	akBytes, err := io.ReadAll(akFile)
 	if err != nil {
 		return "", err
 	}

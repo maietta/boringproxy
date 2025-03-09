@@ -21,6 +21,7 @@ import (
 	"github.com/takingnames/namedrop-go"
 )
 
+// Config holds the server configuration parameters
 type Config struct {
 	SshServerPort int        `json:"ssh_server_port"`
 	PublicIp      string     `json:"public_ip"`
@@ -28,6 +29,7 @@ type Config struct {
 	autoCerts     bool
 }
 
+// SmtpConfig holds SMTP server configuration
 type SmtpConfig struct {
 	Server   string
 	Port     int
@@ -35,6 +37,7 @@ type SmtpConfig struct {
 	Password string
 }
 
+// Server represents the main tunneling server instance
 type Server struct {
 	db           *Database
 	tunMan       *TunnelManager
@@ -42,6 +45,7 @@ type Server struct {
 	httpListener *PassthroughListener
 }
 
+// Listen starts the tunnel server and handles incoming connections
 func Listen() {
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	newAdminDomain := flagSet.String("admin-domain", "", "Admin Domain")
@@ -99,7 +103,7 @@ func Listen() {
 	}
 
 	if *certDir != "" {
-		certmagic.Default.Storage = &certmagic.FileStorage{*certDir}
+		certmagic.Default.Storage = &certmagic.FileStorage{Path: *certDir}
 	}
 	//certmagic.DefaultACME.DisableHTTPChallenge = true
 	//certmagic.DefaultACME.DisableTLSALPNChallenge = true
@@ -110,7 +114,7 @@ func Listen() {
 
 	if *acceptCATerms {
 		certmagic.DefaultACME.Agreed = true
-		log.Print(fmt.Sprintf("Automatic agreement to CA terms with email (%s)", *acmeEmail))
+		log.Printf("Automatic agreement to CA terms with email (%s)", *acmeEmail)
 	}
 
 	if *acmeUseStaging {
@@ -141,7 +145,7 @@ func Listen() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			log.Print(fmt.Sprintf("Successfully acquired certificate for admin domain (%s)", adminDomain))
+			log.Printf("Successfully acquired certificate for admin domain (%s)", adminDomain)
 		}
 	}
 
@@ -206,7 +210,7 @@ func Listen() {
 			io.WriteString(w, err.Error())
 			return
 		}
-		fmt.Println(fmt.Sprintf("%s %s %s %s %s", timestamp, remoteIp, r.Method, r.Host, r.URL.Path))
+		fmt.Printf("%s %s %s %s %s\n", timestamp, remoteIp, r.Method, r.Host, r.URL.Path)
 
 		hostParts := strings.Split(r.Host, ":")
 		hostDomain := hostParts[0]
@@ -221,7 +225,7 @@ func Listen() {
 			if errorParam != "" {
 				db.DeleteDNSRequest(requestId)
 
-				http.Redirect(w, r, "/alert?message=Domain request failed", 303)
+				http.Redirect(w, r, "/alert?message=Domain request failed", http.StatusSeeOther)
 				return
 			}
 
@@ -294,17 +298,17 @@ func Listen() {
 					}
 				}
 
-				http.Redirect(w, r, url, 303)
+				http.Redirect(w, r, url, http.StatusSeeOther)
 			} else {
 				adminDomain := db.GetAdminDomain()
-				http.Redirect(w, r, fmt.Sprintf("https://%s/edit-tunnel?domain=%s", adminDomain, fqdn), 303)
+				http.Redirect(w, r, fmt.Sprintf("https://%s/edit-tunnel?domain=%s", adminDomain, fqdn), http.StatusSeeOther)
 			}
 
 		} else if hostDomain == db.GetAdminDomain() {
 			if strings.HasPrefix(r.URL.Path, "/api/") {
 				http.StripPrefix("/api", api).ServeHTTP(w, r)
 			} else {
-				webUiHandler.handleWebUiRequest(w, r)
+				webUiHandler.handleWebUIRequest(w, r)
 			}
 		} else {
 
@@ -460,11 +464,11 @@ func printLoginInfo(token, adminDomain string, httpsPort int) {
 	} else {
 		url = fmt.Sprintf("https://%s/login?access_token=%s", adminDomain, token)
 	}
-	log.Println(fmt.Sprintf("Admin login link: %s", url))
+	log.Printf("Admin login link: %s\n", url)
 	qrterminal.GenerateHalfBlock(url, qrterminal.L, os.Stdout)
 }
 
-// Taken from https://stackoverflow.com/a/48519490/943814
+// IsIPv4 checks if the given address is an IPv4 address
 func IsIPv4(address string) bool {
 	return strings.Count(address, ":") < 2
 }

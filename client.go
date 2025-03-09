@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -140,7 +141,7 @@ func (c *Client) Run(ctx context.Context) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("Failed to create client. HTTP Status code: %d. Failed to read body", resp.StatusCode)
 		}
@@ -199,7 +200,7 @@ func (c *Client) PollTunnels(ctx context.Context) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return errors.New("Failed to listen (not 200 status)")
+		return errors.New("failed to listen (not 200 status)")
 	}
 
 	etag := resp.Header["Etag"][0]
@@ -299,7 +300,7 @@ func (c *Client) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 	sshHost := fmt.Sprintf("%s:%d", tunnel.ServerAddress, tunnel.ServerPort)
 	client, err := ssh.Dial("tcp", sshHost, config)
 	if err != nil {
-		return fmt.Errorf("Failed to dial: %v", err)
+		return fmt.Errorf("failed to dial: %v", err)
 	}
 	defer client.Close()
 
@@ -310,7 +311,7 @@ func (c *Client) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 	tunnelAddr := fmt.Sprintf("%s:%d", bindAddr, tunnel.TunnelPort)
 	listener, err := client.Listen("tcp", tunnelAddr)
 	if err != nil {
-		return fmt.Errorf("Unable to register tcp forward for %s:%d %v", bindAddr, tunnel.TunnelPort, err)
+		return fmt.Errorf("unable to register tcp forward for %s:%d %v", bindAddr, tunnel.TunnelPort, err)
 	}
 	defer listener.Close()
 
@@ -378,9 +379,4 @@ func (c *Client) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 	<-ctx.Done()
 
 	return nil
-}
-
-func printJson(data interface{}) {
-	d, _ := json.MarshalIndent(data, "", "  ")
-	fmt.Println(string(d))
 }

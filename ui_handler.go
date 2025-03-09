@@ -22,7 +22,8 @@ import (
 //go:embed logo.png templates
 var fs embed.FS
 
-type WebUiHandler struct {
+// WebUIHandler handles all web interface operations
+type WebUIHandler struct {
 	config          *Config
 	db              *Database
 	api             *Api
@@ -33,6 +34,7 @@ type WebUiHandler struct {
 	mutex           *sync.Mutex
 }
 
+// ReqResult represents the result of an asynchronous request
 type ReqResult struct {
 	err         error
 	redirectUrl string
@@ -60,8 +62,8 @@ type LoginData struct {
 	Head template.HTML
 }
 
-func NewWebUiHandler(config *Config, db *Database, api *Api, auth *Auth) *WebUiHandler {
-	return &WebUiHandler{
+func NewWebUiHandler(config *Config, db *Database, api *Api, auth *Auth) *WebUIHandler {
+	return &WebUIHandler{
 		config:          config,
 		db:              db,
 		api:             api,
@@ -71,34 +73,36 @@ func NewWebUiHandler(config *Config, db *Database, api *Api, auth *Auth) *WebUiH
 	}
 }
 
-func (h *WebUiHandler) handleWebUiRequest(w http.ResponseWriter, r *http.Request) {
-
+func (h *WebUIHandler) handleWebUIRequest(w http.ResponseWriter, r *http.Request) {
 	var err error
 	h.tmpl, err = template.ParseFS(fs, "templates/*.tmpl")
 	if err != nil {
-		fmt.Println(err.Error())
+		http.Error(w, fmt.Sprintf("Failed to parse templates: %v", err), http.StatusInternalServerError)
 		return
 	}
 
 	token, err := extractToken("access_token", r)
 	if err != nil {
-		h.sendLoginPage(w, r, 401)
+		h.sendLoginPage(w, r, http.StatusUnauthorized)
 		return
 	}
 
 	tokenData, exists := h.db.GetTokenData(token)
 	if !exists {
-		h.sendLoginPage(w, r, 403)
+		h.sendLoginPage(w, r, http.StatusForbidden)
 		return
 	}
 
 	if tokenData.Client != "" {
-		w.WriteHeader(403)
-		h.alertDialog(w, r, "This token is limited to a specific client and cannot be used for the web UI", "/")
+		http.Error(w, "This token is limited to a specific client and cannot be used for the web UI", http.StatusForbidden)
 		return
 	}
 
-	user, _ := h.db.GetUser(tokenData.Owner)
+	user, exists := h.db.GetUser(tokenData.Owner)
+	if !exists {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
 
 	tunnels := h.api.GetTunnels(tokenData)
 
@@ -330,7 +334,7 @@ func (h *WebUiHandler) handleWebUiRequest(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (h *WebUiHandler) handleTokens(w http.ResponseWriter, r *http.Request, user User, tokenData TokenData) {
+func (h *WebUIHandler) handleTokens(w http.ResponseWriter, r *http.Request, user User, tokenData TokenData) {
 
 	r.ParseForm()
 
@@ -408,7 +412,7 @@ func (h *WebUiHandler) handleTokens(w http.ResponseWriter, r *http.Request, user
 	}
 }
 
-func (h *WebUiHandler) handleClients(w http.ResponseWriter, r *http.Request, user User, tokenData TokenData) {
+func (h *WebUIHandler) handleClients(w http.ResponseWriter, r *http.Request, user User, tokenData TokenData) {
 
 	r.ParseForm()
 
@@ -468,25 +472,21 @@ func (h *WebUiHandler) handleClients(w http.ResponseWriter, r *http.Request, use
 		return
 	}
 }
-func (h *WebUiHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
-
+func (h *WebUIHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
-		w.WriteHeader(405)
-		w.Write([]byte("Invalid method for login"))
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
 
 	r.ParseForm()
 
 	tokenList, ok := r.Form["access_token"]
-
 	if !ok {
-		w.WriteHeader(400)
-		w.Write([]byte("Token required for login"))
+		http.Error(w, "Token required for login", http.StatusBadRequest)
 		return
 	}
 
 	token := tokenList[0]
-
 	if h.auth.Authorized(token) {
 		cookie := &http.Cookie{
 			Name:     "access_token",
@@ -496,14 +496,13 @@ func (h *WebUiHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 			MaxAge:   86400 * 365,
 		}
 		http.SetCookie(w, cookie)
-		http.Redirect(w, r, "/tunnels", 303)
+		http.Redirect(w, r, "/tunnels", http.StatusSeeOther)
 	} else {
-		h.sendLoginPage(w, r, 403)
-		return
+		h.sendLoginPage(w, r, http.StatusForbidden)
 	}
 }
 
-func (h *WebUiHandler) handleTunnels(w http.ResponseWriter, r *http.Request, tokenData TokenData, user User) {
+func (h *WebUIHandler) handleTunnels(w http.ResponseWriter, r *http.Request, tokenData TokenData, user User) {
 
 	switch r.Method {
 	case "POST":
@@ -532,7 +531,7 @@ func (h *WebUiHandler) handleTunnels(w http.ResponseWriter, r *http.Request, tok
 	}
 }
 
-func (h *WebUiHandler) handleCreateTunnel(w http.ResponseWriter, r *http.Request, tokenData TokenData) {
+func (h *WebUIHandler) handleCreateTunnel(w http.ResponseWriter, r *http.Request, tokenData TokenData) {
 
 	pendingId, err := genRandomCode(16)
 	if err != nil {
@@ -587,7 +586,7 @@ func (h *WebUiHandler) handleCreateTunnel(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (h *WebUiHandler) sendLoginPage(w http.ResponseWriter, r *http.Request, code int) {
+func (h *WebUIHandler) sendLoginPage(w http.ResponseWriter, r *http.Request, code int) {
 
 	loginData := LoginData{
 		Head: h.headHtml,
@@ -602,7 +601,7 @@ func (h *WebUiHandler) sendLoginPage(w http.ResponseWriter, r *http.Request, cod
 	}
 }
 
-func (h *WebUiHandler) handleUsers(w http.ResponseWriter, r *http.Request, tokenData TokenData, user User) {
+func (h *WebUIHandler) handleUsers(w http.ResponseWriter, r *http.Request, tokenData TokenData, user User) {
 
 	r.ParseForm()
 
@@ -647,7 +646,7 @@ func (h *WebUiHandler) handleUsers(w http.ResponseWriter, r *http.Request, token
 	}
 }
 
-func (h *WebUiHandler) confirmDeleteUser(w http.ResponseWriter, r *http.Request) {
+func (h *WebUIHandler) confirmDeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	r.ParseForm()
 
@@ -673,7 +672,7 @@ func (h *WebUiHandler) confirmDeleteUser(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-func (h *WebUiHandler) deleteUser(w http.ResponseWriter, r *http.Request, tokenData TokenData) {
+func (h *WebUIHandler) deleteUser(w http.ResponseWriter, r *http.Request, tokenData TokenData) {
 
 	r.ParseForm()
 
@@ -687,7 +686,7 @@ func (h *WebUiHandler) deleteUser(w http.ResponseWriter, r *http.Request, tokenD
 	http.Redirect(w, r, "/users", 303)
 }
 
-func (h *WebUiHandler) confirmDeleteToken(w http.ResponseWriter, r *http.Request) {
+func (h *WebUIHandler) confirmDeleteToken(w http.ResponseWriter, r *http.Request) {
 
 	r.ParseForm()
 
@@ -712,7 +711,7 @@ func (h *WebUiHandler) confirmDeleteToken(w http.ResponseWriter, r *http.Request
 		return
 	}
 }
-func (h *WebUiHandler) deleteToken(w http.ResponseWriter, r *http.Request, tokenData TokenData) {
+func (h *WebUIHandler) deleteToken(w http.ResponseWriter, r *http.Request, tokenData TokenData) {
 
 	r.ParseForm()
 	err := h.api.DeleteToken(tokenData, r.Form)
@@ -725,7 +724,7 @@ func (h *WebUiHandler) deleteToken(w http.ResponseWriter, r *http.Request, token
 	http.Redirect(w, r, "/tokens", 303)
 }
 
-func (h *WebUiHandler) confirmDeleteClient(w http.ResponseWriter, r *http.Request) {
+func (h *WebUIHandler) confirmDeleteClient(w http.ResponseWriter, r *http.Request) {
 
 	r.ParseForm()
 
@@ -746,7 +745,7 @@ func (h *WebUiHandler) confirmDeleteClient(w http.ResponseWriter, r *http.Reques
 		return
 	}
 }
-func (h *WebUiHandler) deleteClient(w http.ResponseWriter, r *http.Request, tokenData TokenData) {
+func (h *WebUIHandler) deleteClient(w http.ResponseWriter, r *http.Request, tokenData TokenData) {
 
 	r.ParseForm()
 
@@ -763,7 +762,7 @@ func (h *WebUiHandler) deleteClient(w http.ResponseWriter, r *http.Request, toke
 	http.Redirect(w, r, "/clients", 303)
 }
 
-func (h *WebUiHandler) alertDialog(w http.ResponseWriter, r *http.Request, message, redirectUrl string) error {
+func (h *WebUIHandler) alertDialog(w http.ResponseWriter, r *http.Request, message, redirectUrl string) error {
 	err := h.tmpl.ExecuteTemplate(w, "alert.tmpl", &AlertData{
 		Head:        h.headHtml,
 		Message:     message,
@@ -777,43 +776,54 @@ func (h *WebUiHandler) alertDialog(w http.ResponseWriter, r *http.Request, messa
 	return nil
 }
 
-func (h *WebUiHandler) handleLoading(w http.ResponseWriter, r *http.Request) {
-
+func (h *WebUIHandler) handleLoading(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
-		w.WriteHeader(405)
-		h.alertDialog(w, r, "Invalid method for users", "/tunnels")
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
 
-	r.ParseForm()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
 
 	pendingId := r.Form.Get("id")
+	if pendingId == "" {
+		http.Error(w, "Missing id parameter", http.StatusBadRequest)
+		return
+	}
 
 	h.mutex.Lock()
-	doneSignal := h.pendingRequests[pendingId]
+	doneSignal, exists := h.pendingRequests[pendingId]
+	if !exists {
+		h.mutex.Unlock()
+		http.Error(w, "Invalid or expired request id", http.StatusBadRequest)
+		return
+	}
 	delete(h.pendingRequests, pendingId)
 	h.mutex.Unlock()
 
 	result := <-doneSignal
-
 	if result.err != nil {
-		w.WriteHeader(400)
-		h.alertDialog(w, r, result.err.Error(), result.redirectUrl)
+		w.WriteHeader(http.StatusBadRequest)
+		if err := h.alertDialog(w, r, result.err.Error(), result.redirectUrl); err != nil {
+			http.Error(w, "Failed to render alert dialog", http.StatusInternalServerError)
+		}
 		return
 	}
 
-	http.Redirect(w, r, result.redirectUrl, 303)
+	http.Redirect(w, r, result.redirectUrl, http.StatusSeeOther)
 }
 
-func (h *WebUiHandler) handleTakingNames(w http.ResponseWriter, r *http.Request) {
+func (h *WebUIHandler) handleTakingNames(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		link, err := h.config.DNSClient.BootstrapLink()
 		if err != nil {
-			w.WriteHeader(500)
-			w.Write([]byte(err.Error()))
+			http.Error(w, fmt.Sprintf("Failed to get bootstrap link: %v", err), http.StatusInternalServerError)
 			return
 		}
 		http.Redirect(w, r, link, http.StatusFound)
 		return
 	}
-	w.WriteHeader(405)
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
