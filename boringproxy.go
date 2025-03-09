@@ -77,7 +77,7 @@ func Listen() {
 	if *publicIp != "" {
 		ip = *publicIp
 	} else {
-		ip, err = namedropClient.GetPublicIp()
+		ip, err = namedropClient.GetPublicIp("")
 		if err != nil {
 			fmt.Printf("WARNING: Failed to determine public IP: %s\n", err.Error())
 		}
@@ -425,7 +425,7 @@ func setAdminDomain(certConfig *certmagic.Config, db *Database, namedropClient *
 		}
 
 		qrterminal.GenerateHalfBlock(namedropLink, qrterminal.L, os.Stdout)
-		fmt.Println("Use the link below or scan the QR code above to select an admin domain:\n")
+		fmt.Print("Use the link below or scan the QR code above to select an admin domain:\n")
 		fmt.Printf("%s\n\n", namedropLink)
 
 	default:

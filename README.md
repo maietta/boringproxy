@@ -25,6 +25,10 @@ allows you to easily do that.
 start on the website, [boringproxy.io](https://boringproxy.io/). The information
 in this README is just for building from source.
 
+# Requirements
+
+- Go 1.22 or higher
+- Linux/Unix system with `setcap` for binding to ports 80/443 (optional)
 
 # Building
 
@@ -71,15 +75,43 @@ sudo setcap cap_net_bind_service=+ep boringproxy
 
 ## Server
 
+For production use with HTTPS (requires domain and email for Let's Encrypt):
 ```bash
-./boringproxy server
+./boringproxy server --db-dir ~/.boringproxy --cert-dir ~/.boringproxy/certs --acme-email your@email.com --accept-ca-terms --print-login
 ```
+
+For local testing (HTTP only):
+```bash
+./boringproxy server --db-dir ~/.boringproxy --allow-http --http-port 3000 --https-port 3001 --admin-domain localhost --print-login
+```
+
+### Port Configuration
+
+The server supports several port configurations:
+
+1. Standard ports (80/443) - requires root privileges or setcap
+2. Non-privileged ports (e.g., 3000/3001) - recommended for local testing
+3. HTTP-only mode - useful for development or behind another proxy
+
+Use these flags to configure ports:
+- `--http-port`: HTTP port (default 80)
+- `--https-port`: HTTPS port (default 443)
+- `--allow-http`: Enable unencrypted HTTP traffic
+
+Note: Let's Encrypt certificate management only works with standard ports 80/443.
 
 ## Client
 
 ```bash
 ./boringproxy client -server bpdemo.brng.pro -token fKFIjefKDFLEFijKDFJKELJF -client-name demo-client -user demo-user
 ```
+
+# Dependencies
+
+Key dependencies and their versions:
+- certmagic v0.22.0 - TLS certificate management
+- qrterminal/v3 v3.2.0 - QR code terminal display
+- namedrop-go v0.8.0 - Domain management integration
 
 [0]: https://forum.indiebits.io
 
