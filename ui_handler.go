@@ -3,12 +3,15 @@ package tunnels
 import (
 	"embed"
 	"encoding/base64"
+
 	//"encoding/json"
 	"fmt"
-	qrcode "github.com/skip2/go-qrcode"
 	"html/template"
 	"io"
 	"net/http"
+
+	qrcode "github.com/skip2/go-qrcode"
+
 	//"net/url"
 	//"os"
 	"strings"
@@ -280,10 +283,7 @@ func (h *WebUiHandler) handleWebUiRequest(w http.ResponseWriter, r *http.Request
 
 		h.alertDialog(w, r, message, "/")
 	case "/takingnames":
-
-		namedropLink := h.config.namedropClient.DomainRequestLink()
-
-		http.Redirect(w, r, namedropLink, 303)
+		h.handleTakingNames(w, r)
 	default:
 		if strings.HasPrefix(r.URL.Path, "/tunnels/") {
 
@@ -802,4 +802,18 @@ func (h *WebUiHandler) handleLoading(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, result.redirectUrl, 303)
+}
+
+func (h *WebUiHandler) handleTakingNames(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		link, err := h.config.DNSClient.BootstrapLink()
+		if err != nil {
+			w.WriteHeader(500)
+			w.Write([]byte(err.Error()))
+			return
+		}
+		http.Redirect(w, r, link, http.StatusFound)
+		return
+	}
+	w.WriteHeader(405)
 }

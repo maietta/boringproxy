@@ -10,7 +10,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/boringproxy/boringproxy"
+	tunnels "github.com/premoweb/tunnels.pro"
 )
 
 const usage = `Usage: %s [command] [flags]
@@ -30,6 +30,7 @@ func fail(msg string) {
 	fmt.Fprintln(os.Stderr, msg)
 	os.Exit(1)
 }
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, os.Args[0]+": Need a command")
@@ -83,7 +84,7 @@ func main() {
 			}
 		}
 	case "server":
-		boringproxy.Listen()
+		tunnels.Listen()
 	case "client":
 		flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 		server := flagSet.String("server", "", "boringproxy server")
@@ -111,12 +112,20 @@ func main() {
 			fail("-token is required")
 		}
 
+		if *name == "" {
+			fail("-client-name is required")
+		}
+
+		if *user == "" {
+			fail("-user is required")
+		}
+
 		minPollInterval := 100
 		if *pollInterval != 0 && *pollInterval < minPollInterval {
 			fail(fmt.Sprintf("-poll-interval-ms must be at least %d, or 0 to disable polling", minPollInterval))
 		}
 
-		config := &boringproxy.ClientConfig{
+		config := &tunnels.ClientConfig{
 			ServerAddr:     *server,
 			Token:          *token,
 			ClientName:     *name,
@@ -132,7 +141,7 @@ func main() {
 
 		ctx := context.Background()
 
-		client, err := boringproxy.NewClient(config)
+		client, err := tunnels.NewClient(config)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, err.Error())
 			os.Exit(1)

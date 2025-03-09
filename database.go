@@ -21,9 +21,11 @@ type Database struct {
 	mutex       *sync.Mutex
 }
 
+// TokenData represents token information
 type TokenData struct {
-	Owner  string `json:"owner"`
-	Client string `json:"client,omitempty"`
+	Owner  string   `json:"owner"`
+	Client string   `json:"client"`
+	Scopes []string `json:"scopes"`
 }
 
 type User struct {

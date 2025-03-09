@@ -1,7 +1,10 @@
+// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license.
+
 // NOTE: A lot of this code was copied from this very helpful article:
 // https://www.agwa.name/blog/post/writing_an_sni_proxy_in_go
 
-package boringproxy
+package tunnels
 
 import (
 	"bytes"

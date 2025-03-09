@@ -22,10 +22,10 @@ import (
 )
 
 type Config struct {
-	SshServerPort  int    `json:"ssh_server_port"`
-	PublicIp       string `json:"public_ip"`
-	namedropClient *namedrop.Client
-	autoCerts      bool
+	SshServerPort int        `json:"ssh_server_port"`
+	PublicIp      string     `json:"public_ip"`
+	DNSClient     *DNSClient `json:"dns_client"`
+	autoCerts     bool
 }
 
 type SmtpConfig struct {
@@ -70,14 +70,13 @@ func Listen() {
 		log.Fatal(err)
 	}
 
-	namedropClient := namedrop.NewClient(db, db.GetAdminDomain(), "takingnames.io/namedrop")
+	dnsClient := NewDNSClient(db, db.GetAdminDomain())
 
 	var ip string
-
 	if *publicIp != "" {
 		ip = *publicIp
 	} else {
-		ip, err = namedropClient.GetPublicIp("")
+		ip, err = dnsClient.GetPublicIp()
 		if err != nil {
 			fmt.Printf("WARNING: Failed to determine public IP: %s\n", err.Error())
 		}
@@ -132,7 +131,7 @@ func Listen() {
 
 	if adminDomain == "" {
 
-		err = setAdminDomain(certConfig, db, namedropClient, autoCerts)
+		err = setAdminDomain(certConfig, db, dnsClient, autoCerts)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -167,10 +166,10 @@ func Listen() {
 	}
 
 	config := &Config{
-		SshServerPort:  *sshServerPort,
-		PublicIp:       ip,
-		namedropClient: namedropClient,
-		autoCerts:      autoCerts,
+		SshServerPort: *sshServerPort,
+		PublicIp:      ip,
+		DNSClient:     dnsClient,
+		autoCerts:     autoCerts,
 	}
 
 	tunMan := NewTunnelManager(config, db, certConfig)
@@ -226,22 +225,35 @@ func Listen() {
 				return
 			}
 
-			namedropTokenData, err := namedropClient.GetToken(requestId, code)
+			tokenData, err := dnsClient.GetToken(requestId, code)
 			if err != nil {
 				w.WriteHeader(500)
 				io.WriteString(w, err.Error())
 				return
 			}
 
-			domain := namedropTokenData.Scopes[0].Domain
-			host := namedropTokenData.Scopes[0].Host
+			if len(tokenData.Scopes) == 0 {
+				w.WriteHeader(500)
+				io.WriteString(w, "No domain scope provided")
+				return
+			}
+
+			parts := strings.Split(tokenData.Scopes[0], ".")
+			if len(parts) < 2 {
+				w.WriteHeader(500)
+				io.WriteString(w, "Invalid domain format")
+				return
+			}
+
+			host := parts[0]
+			domain := strings.Join(parts[1:], ".")
 
 			recordType := "AAAA"
 			if IsIPv4(config.PublicIp) {
 				recordType = "A"
 			}
 
-			createRecordReq := namedrop.Record{
+			createRecordReq := Record{
 				Domain: domain,
 				Host:   host,
 				Type:   recordType,
@@ -249,7 +261,7 @@ func Listen() {
 				TTL:    300,
 			}
 
-			err = namedropClient.CreateRecord(createRecordReq)
+			err = dnsClient.CreateRecord(createRecordReq)
 			if err != nil {
 				w.WriteHeader(500)
 				io.WriteString(w, err.Error())
@@ -260,7 +272,7 @@ func Listen() {
 
 			if db.GetAdminDomain() == "" {
 				db.SetAdminDomain(fqdn)
-				namedropClient.SetDomain(fqdn)
+				dnsClient.SetDomain(fqdn)
 
 				if autoCerts {
 					// TODO: Might want to get all certs here, not just the admin domain
@@ -401,7 +413,7 @@ func (p *Server) passthroughRequest(conn net.Conn, tunnel Tunnel) {
 	wg.Wait()
 }
 
-func setAdminDomain(certConfig *certmagic.Config, db *Database, client *Client, autoCerts bool) error {
+func setAdminDomain(certConfig *certmagic.Config, db *Database, client *DNSClient, autoCerts bool) error {
 	action := prompt("\nNo admin domain set. Select an option below:\nEnter '1' to input manually\nEnter '2' to configure through tunnels.pro\n")
 	switch action {
 	case "1":
