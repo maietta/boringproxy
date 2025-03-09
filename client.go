@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -71,13 +70,13 @@ func NewClient(config *ClientConfig) (*Client, error) {
 	var err error
 	certmagic.HTTPSPort, err = randomOpenPort()
 	if err != nil {
-		return nil, errors.New("Failed get random port for TLS challenges")
+		return nil, errors.New("failed to get random port for TLS challenges")
 	}
 
 	certmagic.DefaultACME.DisableHTTPChallenge = true
 
 	if config.CertDir != "" {
-		certmagic.Default.Storage = &certmagic.FileStorage{config.CertDir}
+		certmagic.Default.Storage = &certmagic.FileStorage{Path: config.CertDir}
 	}
 
 	if config.AcmeEmail != "" {
@@ -129,25 +128,25 @@ func (c *Client) Run(ctx context.Context) error {
 
 	clientReq, err := http.NewRequest("POST", url, nil)
 	if err != nil {
-		return fmt.Errorf("Failed to create request for URL %s", url)
+		return fmt.Errorf("failed to create request for URL %s", url)
 	}
 	if len(c.token) > 0 {
 		clientReq.Header.Add("Authorization", "bearer "+c.token)
 	}
 	resp, err := c.httpClient.Do(clientReq)
 	if err != nil {
-		return fmt.Errorf("Failed to create client. Ensure the server is running. URL: %s", url)
+		return fmt.Errorf("failed to create client. ensure the server is running. URL: %s", url)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return fmt.Errorf("Failed to create client. HTTP Status code: %d. Failed to read body", resp.StatusCode)
+			return fmt.Errorf("failed to create client. HTTP status code: %d. failed to read body", resp.StatusCode)
 		}
 
 		msg := string(body)
-		return fmt.Errorf("Failed to create client. Are the user ('%s') and token correct? HTTP Status code: %d. Message: %s", c.user, resp.StatusCode, msg)
+		return fmt.Errorf("failed to create client. are the user ('%s') and token correct? HTTP status code: %d. message: %s", c.user, resp.StatusCode, msg)
 	}
 
 	pollChan := make(chan struct{})
@@ -207,7 +206,10 @@ func (c *Client) PollTunnels(ctx context.Context) error {
 
 	if etag != c.previousEtag {
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read response body: %v", err)
+		}
 
 		tunnels := make(map[string]Tunnel)
 
@@ -263,7 +265,7 @@ func (c *Client) SyncTunnels(ctx context.Context, serverTunnels map[string]Tunne
 	}
 
 	// delete any tunnels that no longer exist on server
-	for k, _ := range c.tunnels {
+	for k := range c.tunnels {
 		_, exists := serverTunnels[k]
 		if !exists {
 			log.Println("Kill tunnel", k)
@@ -283,7 +285,7 @@ func (c *Client) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 
 	signer, err := ssh.ParsePrivateKey([]byte(tunnel.TunnelPrivateKey))
 	if err != nil {
-		return fmt.Errorf("Unable to parse private key: %v", err)
+		return fmt.Errorf("unable to parse private key: %v", err)
 	}
 
 	//var hostKey ssh.PublicKey

@@ -24,10 +24,5 @@ func NewAuth(db *Database) *Auth {
 
 func (a *Auth) Authorized(token string) bool {
 	_, exists := a.db.GetTokenData(token)
-
-	if exists {
-		return true
-	}
-
-	return false
+	return exists
 }

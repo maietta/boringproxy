@@ -4,10 +4,11 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"net/http"
+	"os"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -15,11 +16,11 @@ import (
 func saveJson(data interface{}, filePath string) error {
 	jsonStr, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
-		return errors.New("Error serializing JSON")
+		return errors.New("error serializing JSON")
 	} else {
-		err := ioutil.WriteFile(filePath, jsonStr, 0644)
+		err := os.WriteFile(filePath, jsonStr, 0644)
 		if err != nil {
-			return errors.New("Error saving JSON")
+			return errors.New("error saving JSON")
 		}
 	}
 	return nil
@@ -51,7 +52,7 @@ func extractToken(tokenName string, r *http.Request) (string, error) {
 		return tokenCookie.Value, nil
 	}
 
-	return "", errors.New("No token found")
+	return "", errors.New("no token found")
 }
 
 const chars string = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -86,10 +87,5 @@ func randomOpenPort() (int, error) {
 }
 
 func stringInArray(value string, array []string) bool {
-	for _, item := range array {
-		if item == value {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(array, value)
 }

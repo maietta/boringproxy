@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"maps"
 	"net/http"
 
 	qrcode "github.com/skip2/go-qrcode"
@@ -83,13 +84,13 @@ func (h *WebUIHandler) handleWebUIRequest(w http.ResponseWriter, r *http.Request
 
 	token, err := extractToken("access_token", r)
 	if err != nil {
-		h.sendLoginPage(w, r, http.StatusUnauthorized)
+		h.sendLoginPage(w, http.StatusUnauthorized)
 		return
 	}
 
 	tokenData, exists := h.db.GetTokenData(token)
 	if !exists {
-		h.sendLoginPage(w, r, http.StatusForbidden)
+		h.sendLoginPage(w, http.StatusForbidden)
 		return
 	}
 
@@ -125,7 +126,7 @@ func (h *WebUIHandler) handleWebUIRequest(w http.ResponseWriter, r *http.Request
 		logoPngBytes, err := fs.ReadFile("logo.png")
 		if err != nil {
 			w.WriteHeader(500)
-			h.alertDialog(w, r, err.Error(), "/")
+			h.alertDialog(w, err.Error(), "/")
 			return
 		}
 
@@ -199,7 +200,7 @@ func (h *WebUIHandler) handleWebUIRequest(w http.ResponseWriter, r *http.Request
 		err := h.api.DeleteTunnel(tokenData, r.Form)
 		if err != nil {
 			w.WriteHeader(400)
-			h.alertDialog(w, r, err.Error(), "/tunnels")
+			h.alertDialog(w, err.Error(), "/tunnels")
 			return
 		}
 
@@ -212,7 +213,7 @@ func (h *WebUIHandler) handleWebUIRequest(w http.ResponseWriter, r *http.Request
 		tun, err := h.api.GetTunnel(tokenData, r.Form)
 		if err != nil {
 			w.WriteHeader(400)
-			h.alertDialog(w, r, err.Error(), "/tunnels")
+			h.alertDialog(w, err.Error(), "/tunnels")
 			return
 		}
 
@@ -264,7 +265,7 @@ func (h *WebUIHandler) handleWebUIRequest(w http.ResponseWriter, r *http.Request
 		err := h.tmpl.ExecuteTemplate(w, "confirm.tmpl", data)
 		if err != nil {
 			w.WriteHeader(500)
-			h.alertDialog(w, r, err.Error(), "/")
+			h.alertDialog(w, err.Error(), "/")
 			return
 		}
 
@@ -276,7 +277,7 @@ func (h *WebUIHandler) handleWebUIRequest(w http.ResponseWriter, r *http.Request
 			HttpOnly: true,
 		}
 		http.SetCookie(w, cookie)
-		http.Redirect(w, r, "/tunnels", 303)
+		http.Redirect(w, r, "/tunnels", http.StatusSeeOther)
 	case "/loading":
 		h.handleLoading(w, r)
 	case "/alert":
@@ -285,7 +286,7 @@ func (h *WebUIHandler) handleWebUIRequest(w http.ResponseWriter, r *http.Request
 
 		message := r.Form.Get("message")
 
-		h.alertDialog(w, r, message, "/")
+		h.alertDialog(w, message, "/")
 	case "/takingnames":
 		h.handleTakingNames(w, r)
 	default:
@@ -297,7 +298,7 @@ func (h *WebUIHandler) handleWebUIRequest(w http.ResponseWriter, r *http.Request
 
 			if len(parts) != 3 {
 				w.WriteHeader(400)
-				h.alertDialog(w, r, "Invalid path", "/tunnels")
+				h.alertDialog(w, "Invalid path", "/tunnels")
 				return
 			}
 
@@ -308,7 +309,7 @@ func (h *WebUIHandler) handleWebUIRequest(w http.ResponseWriter, r *http.Request
 			tunnel, err := h.api.GetTunnel(tokenData, r.Form)
 			if err != nil {
 				w.WriteHeader(400)
-				h.alertDialog(w, r, err.Error(), "/tunnels")
+				h.alertDialog(w, err.Error(), "/tunnels")
 				return
 			}
 
@@ -328,7 +329,7 @@ func (h *WebUIHandler) handleWebUIRequest(w http.ResponseWriter, r *http.Request
 			}
 		} else {
 			w.WriteHeader(404)
-			h.alertDialog(w, r, "Unknown page "+r.URL.Path, "/tunnels")
+			h.alertDialog(w, "Unknown page "+r.URL.Path, "/tunnels")
 			return
 		}
 	}
@@ -354,7 +355,6 @@ func (h *WebUIHandler) handleTokens(w http.ResponseWriter, r *http.Request, user
 				if tokenData.Owner == td.Owner {
 					tokens[token] = td
 				}
-
 			}
 
 			users = make(map[string]User)
@@ -370,7 +370,7 @@ func (h *WebUIHandler) handleTokens(w http.ResponseWriter, r *http.Request, user
 			png, err := qrcode.Encode(loginUrl, qrcode.Medium, 256)
 			if err != nil {
 				w.WriteHeader(500)
-				h.alertDialog(w, r, err.Error(), "/tokens")
+				h.alertDialog(w, err.Error(), "/tokens")
 				return
 			}
 
@@ -400,14 +400,14 @@ func (h *WebUIHandler) handleTokens(w http.ResponseWriter, r *http.Request, user
 		_, err := h.api.CreateToken(tokenData, r.Form)
 		if err != nil {
 			w.WriteHeader(500)
-			h.alertDialog(w, r, err.Error(), "/tokens")
+			h.alertDialog(w, err.Error(), "/tokens")
 			return
 		}
 
-		http.Redirect(w, r, "/tokens", 303)
+		http.Redirect(w, r, "/tokens", http.StatusSeeOther)
 	default:
 		w.WriteHeader(405)
-		h.alertDialog(w, r, "Invalid method for tokens", "/tokens")
+		h.alertDialog(w, "Invalid method for tokens", "/tokens")
 		return
 	}
 }
@@ -430,11 +430,8 @@ func (h *WebUIHandler) handleClients(w http.ResponseWriter, r *http.Request, use
 		}
 
 		clients := make(map[string]DbClient)
-
 		for _, user := range users {
-			for clientName, client := range user.Clients {
-				clients[clientName] = client
-			}
+			maps.Copy(clients, user.Clients)
 		}
 
 		templateData := struct {
@@ -461,14 +458,13 @@ func (h *WebUIHandler) handleClients(w http.ResponseWriter, r *http.Request, use
 		err := h.api.SetClient(tokenData, r.Form, owner, clientName)
 		if err != nil {
 			w.WriteHeader(500)
-			h.alertDialog(w, r, err.Error(), "/clients")
+			h.alertDialog(w, err.Error(), "/clients")
 			return
 		}
-
-		http.Redirect(w, r, "/clients", 303)
+		http.Redirect(w, r, "/clients", http.StatusSeeOther)
 	default:
 		w.WriteHeader(405)
-		h.alertDialog(w, r, "Invalid method for tokens", "/tokens")
+		h.alertDialog(w, "Invalid method for tokens", "/tokens")
 		return
 	}
 }
@@ -498,7 +494,7 @@ func (h *WebUIHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.SetCookie(w, cookie)
 		http.Redirect(w, r, "/tunnels", http.StatusSeeOther)
 	} else {
-		h.sendLoginPage(w, r, http.StatusForbidden)
+		h.sendLoginPage(w, http.StatusForbidden)
 	}
 }
 
@@ -536,7 +532,7 @@ func (h *WebUIHandler) handleCreateTunnel(w http.ResponseWriter, r *http.Request
 	pendingId, err := genRandomCode(16)
 	if err != nil {
 		w.WriteHeader(400)
-		h.alertDialog(w, r, err.Error(), "/tunnels")
+		h.alertDialog(w, err.Error(), "/tunnels")
 	}
 
 	doneSignal := make(chan ReqResult)
@@ -571,23 +567,22 @@ func (h *WebUIHandler) handleCreateTunnel(w http.ResponseWriter, r *http.Request
 		h.tmpl.ExecuteTemplate(w, "loading.tmpl", data)
 		if err != nil {
 			w.WriteHeader(500)
-			h.alertDialog(w, r, err.Error(), "/tunnels")
+			h.alertDialog(w, err.Error(), "/tunnels")
 			return
 		}
 
 	case result := <-doneSignal:
 		if result.err != nil {
 			w.WriteHeader(400)
-			h.alertDialog(w, r, result.err.Error(), result.redirectUrl)
+			h.alertDialog(w, result.err.Error(), result.redirectUrl)
 			return
 		}
 
-		http.Redirect(w, r, result.redirectUrl, 303)
+		http.Redirect(w, r, result.redirectUrl, http.StatusSeeOther)
 	}
 }
 
-func (h *WebUIHandler) sendLoginPage(w http.ResponseWriter, r *http.Request, code int) {
-
+func (h *WebUIHandler) sendLoginPage(w http.ResponseWriter, code int) {
 	loginData := LoginData{
 		Head: h.headHtml,
 	}
@@ -635,14 +630,14 @@ func (h *WebUIHandler) handleUsers(w http.ResponseWriter, r *http.Request, token
 		err := h.api.CreateUser(tokenData, r.Form)
 		if err != nil {
 			w.WriteHeader(500)
-			h.alertDialog(w, r, err.Error(), "/users")
+			h.alertDialog(w, err.Error(), "/users")
 			return
 		}
 
-		http.Redirect(w, r, "/users", 303)
+		http.Redirect(w, r, "/users", http.StatusSeeOther)
 	default:
 		w.WriteHeader(405)
-		h.alertDialog(w, r, "Invalid method for users", "/users")
+		h.alertDialog(w, "Invalid method for users", "/users")
 	}
 }
 
@@ -679,11 +674,11 @@ func (h *WebUIHandler) deleteUser(w http.ResponseWriter, r *http.Request, tokenD
 	err := h.api.DeleteUser(tokenData, r.Form)
 	if err != nil {
 		w.WriteHeader(500)
-		h.alertDialog(w, r, err.Error(), "/users")
+		h.alertDialog(w, err.Error(), "/users")
 		return
 	}
 
-	http.Redirect(w, r, "/users", 303)
+	http.Redirect(w, r, "/users", http.StatusSeeOther)
 }
 
 func (h *WebUIHandler) confirmDeleteToken(w http.ResponseWriter, r *http.Request) {
@@ -717,11 +712,11 @@ func (h *WebUIHandler) deleteToken(w http.ResponseWriter, r *http.Request, token
 	err := h.api.DeleteToken(tokenData, r.Form)
 	if err != nil {
 		w.WriteHeader(500)
-		h.alertDialog(w, r, err.Error(), "/tokens")
+		h.alertDialog(w, err.Error(), "/tokens")
 		return
 	}
 
-	http.Redirect(w, r, "/tokens", 303)
+	http.Redirect(w, r, "/tokens", http.StatusSeeOther)
 }
 
 func (h *WebUIHandler) confirmDeleteClient(w http.ResponseWriter, r *http.Request) {
@@ -741,7 +736,7 @@ func (h *WebUIHandler) confirmDeleteClient(w http.ResponseWriter, r *http.Reques
 	err := h.tmpl.ExecuteTemplate(w, "confirm.tmpl", data)
 	if err != nil {
 		w.WriteHeader(500)
-		h.alertDialog(w, r, err.Error(), "/clients")
+		h.alertDialog(w, err.Error(), "/clients")
 		return
 	}
 }
@@ -755,14 +750,14 @@ func (h *WebUIHandler) deleteClient(w http.ResponseWriter, r *http.Request, toke
 	err := h.api.DeleteClient(tokenData, owner, clientName)
 	if err != nil {
 		w.WriteHeader(500)
-		h.alertDialog(w, r, err.Error(), "/clients")
+		h.alertDialog(w, err.Error(), "/clients")
 		return
 	}
 
-	http.Redirect(w, r, "/clients", 303)
+	http.Redirect(w, r, "/clients", http.StatusSeeOther)
 }
 
-func (h *WebUIHandler) alertDialog(w http.ResponseWriter, r *http.Request, message, redirectUrl string) error {
+func (h *WebUIHandler) alertDialog(w http.ResponseWriter, message, redirectUrl string) error {
 	err := h.tmpl.ExecuteTemplate(w, "alert.tmpl", &AlertData{
 		Head:        h.headHtml,
 		Message:     message,
@@ -806,7 +801,7 @@ func (h *WebUIHandler) handleLoading(w http.ResponseWriter, r *http.Request) {
 	result := <-doneSignal
 	if result.err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		if err := h.alertDialog(w, r, result.err.Error(), result.redirectUrl); err != nil {
+		if err := h.alertDialog(w, result.err.Error(), result.redirectUrl); err != nil {
 			http.Error(w, "Failed to render alert dialog", http.StatusInternalServerError)
 		}
 		return
